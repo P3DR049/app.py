@@ -4,13 +4,13 @@ import matplotlib.pyplot as plt
 from typing import List, Dict, Optional
 
 # ========= CORES =========
-NAVY_BG     = "#00112A"  # azul-escuro puro
+NAVY_BG     = "#00112A"  # azul-escuro
 WHITE       = "#FFFFFF"
 LEGO_COLORS = ["#D32F2F", "#1976D2", "#FBC02D", "#388E3C"]
 
 st.set_page_config(page_title="Roleta Musical FLL", page_icon="🎛", layout="wide")
 
-# ========= ESTILO GLOBAL =========
+# ========= ESTILO =========
 CSS = f"""
 <style>
 html, body, [data-testid="stAppViewContainer"], [data-testid="stApp"], [data-testid="stSidebar"], section.main {{
@@ -20,12 +20,19 @@ html, body, [data-testid="stAppViewContainer"], [data-testid="stApp"], [data-tes
 label, p, span, div, input, textarea, select {{
   color: {WHITE} !important;
 }}
+/* BOTÕES BRANCOS COM LETRA AZUL-ESCURO */
 .stButton>button {{
-  background: linear-gradient(180deg, #FBC02D, #FDD835);
-  color: #111; font-weight:900; border-radius:10px; padding:12px 20px; border:none;
+  background: {WHITE};
+  color: {NAVY_BG};
+  font-weight:900;
+  border-radius:10px;
+  padding:12px 20px;
+  border:none;
+  box-shadow:0 4px 0 rgba(255,255,255,0.3);
 }}
 .stButton>button:hover {{
-  background: #FFEE58;
+  background:#FFEE58;
+  color:#000;
 }}
 .blocky {{
   background: rgba(255,255,255,0.05);
@@ -43,7 +50,7 @@ h1,h2,h3,h4,h5,h6 {{ color: {WHITE} !important; font-weight:900; }}
   position: relative; width:100%; height: 460px;
   display:flex; align-items:center; justify-content:center;
 }}
-#wheel-img {{ width:380px; height:380px; object-fit:contain; will-change:transform; }}
+#wheel-img {{ width:380px; height:380px; object-fit:contain; will-change:transform; background-color:{NAVY_BG}; border-radius:50%; }}
 .pointer {{
   position:absolute; top: calc(50% - 190px - 10px);
   left: 50%; transform: translateX(-50%);
@@ -90,10 +97,14 @@ def draw_wheel(n_slices: int, highlight_index: int = -1):
         colors[highlight_index] = "#FFD54F"
     startangle = 90 - (0.5 * 360 / n)
     fig, ax = plt.subplots(figsize=(6, 6))
+    # fundo azul escuro
+    fig.patch.set_facecolor(NAVY_BG)
+    ax.set_facecolor(NAVY_BG)
     ax.pie([1]*n, labels=None, startangle=startangle, colors=colors,
            wedgeprops=dict(width=0.5, edgecolor="white", linewidth=2))
     ax.add_artist(plt.Circle((0,0), 0.2, fc=NAVY_BG))
-    ax.set(aspect="equal"); plt.tight_layout()
+    ax.set(aspect="equal")
+    plt.tight_layout()
     return fig
 
 def fig_to_data_url(fig) -> str:
