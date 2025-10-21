@@ -6,6 +6,7 @@ from typing import List, Dict, Optional
 # ========= CORES =========
 NAVY_BG     = "#00112A"  # azul-escuro
 WHITE       = "#FFFFFF"
+RED_BTN     = "#E53935"  # botão girar
 LEGO_COLORS = ["#D32F2F", "#1976D2", "#FBC02D", "#388E3C"]
 
 st.set_page_config(page_title="Roleta Musical FLL", page_icon="🎛", layout="wide")
@@ -13,51 +14,95 @@ st.set_page_config(page_title="Roleta Musical FLL", page_icon="🎛", layout="wi
 # ========= ESTILO =========
 CSS = f"""
 <style>
+/* Fundo e texto geral */
 html, body, [data-testid="stAppViewContainer"], [data-testid="stApp"], [data-testid="stSidebar"], section.main {{
   background-color: {NAVY_BG} !important;
   color: {WHITE} !important;
 }}
-label, p, span, div, input, textarea, select {{
-  color: {WHITE} !important;
+h1,h2,h3,h4,h5,h6, label, p, span, div {{ color: {WHITE} !important; }}
+
+/* Campos brancos com texto AZUL-ESCURO */
+input[type="text"], input[type="search"], textarea, select {{
+  background: {WHITE} !important;
+  color: {NAVY_BG} !important;
+  border-radius: 10px !important;
 }}
-/* BOTÕES BRANCOS COM LETRA AZUL-ESCURO */
+/* Controles do Streamlit */
+.stTextInput input, .stTextArea textarea, .stSelectbox select, .stDateInput input {{
+  background: {WHITE} !important;
+  color: {NAVY_BG} !important;
+}}
+/* Placeholder azul-escuro suave */
+::placeholder {{ color: rgba(0,17,42,0.7) !important; }}
+
+/* Uploader (zona branca e textos azuis) */
+[data-testid="stFileUploadDropzone"] > div {{
+  background: {WHITE} !important;
+  color: {NAVY_BG} !important;
+}}
+[data-testid="stFileUploader"] * {{ color: {NAVY_BG} !important; }}
+
+/* BOTÕES: padrão branco com letra azul-escuro */
 .stButton>button {{
-  background: {WHITE};
-  color: {NAVY_BG};
-  font-weight:900;
-  border-radius:10px;
-  padding:12px 20px;
-  border:none;
-  box-shadow:0 4px 0 rgba(255,255,255,0.3);
+  background: {WHITE} !important;
+  color: {NAVY_BG} !important;
+  font-weight: 900 !important;
+  border-radius: 10px !important;
+  padding: 12px 20px !important;
+  border: none !important;
+  box-shadow: 0 4px 0 rgba(255,255,255,0.25) !important;
 }}
 .stButton>button:hover {{
-  background:#FFEE58;
-  color:#000;
+  background: #FFEE58 !important;
+  color: #000 !important;
 }}
+
+/* Botão de GIRAR (vermelho) — usa wrapper .spin-btn */
+.spin-btn button {{
+  background: {RED_BTN} !important;
+  color: {WHITE} !important;
+  box-shadow: 0 4px 0 rgba(229,57,53,0.35) !important;
+}}
+.spin-btn button:hover {{
+  filter: brightness(1.05);
+}}
+
+/* Cartões/caixas translúcidas */
 .blocky {{
   background: rgba(255,255,255,0.05);
   border-radius: 16px;
   padding: 20px;
   border: 1px solid rgba(255,255,255,0.2);
 }}
-h1,h2,h3,h4,h5,h6 {{ color: {WHITE} !important; font-weight:900; }}
+
+/* Chips coloridos */
 .tag {{
   display:inline-block; padding:6px 10px; border-radius:12px;
   font-size:.85rem; margin:4px 6px 0 0;
 }}
+
 /* ROLETTA */
 #wheel-stage {{
   position: relative; width:100%; height: 460px;
   display:flex; align-items:center; justify-content:center;
 }}
-#wheel-img {{ width:380px; height:380px; object-fit:contain; will-change:transform; background-color:{NAVY_BG}; border-radius:50%; }}
+/* o <img> já sai com fundo azul-escuro e borda circular */
+#wheel-img {{
+  width:380px; height:380px; object-fit:contain; will-change:transform;
+  background-color:{NAVY_BG}; border-radius:50%;
+}}
+/* PONTEIRO: em cima, apontando PARA DENTRO (para BAIXO) e invadindo um pouco a área da roda */
 .pointer {{
-  position:absolute; top: calc(50% - 190px - 10px);
+  position:absolute;
+  top: calc(50% - 190px + 6px);  /* +6 px para "entrar" na roleta */
   left: 50%; transform: translateX(-50%);
   width:0; height:0;
   border-left:14px solid transparent; border-right:14px solid transparent;
-  border-bottom:24px solid #FF5252; /* seta vermelha */
+  border-bottom:24px solid #FF5252; /* triângulo apontando PARA BAIXO */
+  filter: drop-shadow(0 2px 2px rgba(0,0,0,.45));
 }}
+
+/* Giro contínuo e suave */
 @keyframes spinContinuous {{
   from {{ transform: rotate(0deg); }}
   to   {{ transform: rotate(var(--end-rot, 1440deg)); }}
@@ -85,8 +130,7 @@ def wheel_colors(n: int) -> List[str]:
     return [LEGO_COLORS[i % len(LEGO_COLORS)] for i in range(max(1, n))]
 
 def contrast_on(hex_color: str) -> str:
-    h = hex_color.lstrip("#")
-    r,g,b = int(h[0:2],16), int(h[2:4],16), int(h[4:6],16)
+    h = hex_color.lstrip("#"); r,g,b = int(h[0:2],16), int(h[2:4],16), int(h[4:6],16)
     y = 0.2126*r + 0.7152*g + 0.0722*b
     return "#000" if y > 160 else "#fff"
 
@@ -95,22 +139,17 @@ def draw_wheel(n_slices: int, highlight_index: int = -1):
     colors = wheel_colors(n)
     if 0 <= highlight_index < n:
         colors[highlight_index] = "#FFD54F"
-    startangle = 90 - (0.5 * 360 / n)
+    startangle = 90 - (0.5 * 360 / n)  # ponteiro está no topo
     fig, ax = plt.subplots(figsize=(6, 6))
-    # fundo azul escuro
-    fig.patch.set_facecolor(NAVY_BG)
-    ax.set_facecolor(NAVY_BG)
+    fig.patch.set_facecolor(NAVY_BG); ax.set_facecolor(NAVY_BG)  # fundo da figura azul-escuro
     ax.pie([1]*n, labels=None, startangle=startangle, colors=colors,
            wedgeprops=dict(width=0.5, edgecolor="white", linewidth=2))
-    ax.add_artist(plt.Circle((0,0), 0.2, fc=NAVY_BG))
-    ax.set(aspect="equal")
-    plt.tight_layout()
+    ax.add_artist(plt.Circle((0,0), 0.2, fc=NAVY_BG))  # centro azul-escuro
+    ax.set(aspect="equal"); plt.tight_layout()
     return fig
 
 def fig_to_data_url(fig) -> str:
-    buf = io.BytesIO()
-    fig.savefig(buf, format="png", bbox_inches="tight", dpi=160)
-    plt.close(fig)
+    buf = io.BytesIO(); fig.savefig(buf, format="png", bbox_inches="tight", dpi=160); plt.close(fig)
     return f"data:image/png;base64,{base64.b64encode(buf.getvalue()).decode()}"
 
 def wheel_html(img_src: str, duration_s: float = 0.0, end_rot_deg: float = 0.0, animate=False) -> str:
@@ -131,8 +170,7 @@ def render_autoplay_audio(audio_bytes: bytes, mime: str):
     </audio>""", unsafe_allow_html=True)
 
 def add_song(title: str, url: str = "", file=None):
-    title = (title or "").strip()
-    url   = (url or "").strip()
+    title = (title or "").strip(); url = (url or "").strip()
     if not title and file is not None:
         title = (file.name or "Sem título").rsplit(".", 1)[0]
     if not title: st.warning("Digite o nome da música ou envie um arquivo."); return
@@ -174,7 +212,10 @@ if page == "Gerenciar músicas":
         st.subheader("Músicas na roleta")
         cols = wheel_colors(len(st.session_state.songs))
         for i, s in enumerate(st.session_state.songs):
-            st.markdown(f'<span class="tag" style="background:{cols[i]};color:{contrast_on(cols[i])}">{s["title"]}</span>', unsafe_allow_html=True)
+            st.markdown(
+                f'<span class="tag" style="background:{cols[i]};color:{contrast_on(cols[i])}">{s["title"]}</span>',
+                unsafe_allow_html=True
+            )
 
         st.markdown("---")
         old = st.selectbox("Escolha a música", [s["title"] for s in st.session_state.songs])
@@ -201,7 +242,10 @@ if page == "Roleta":
 
     colA, colB = st.columns([1,1])
     with colA:
+        # Botão de girar com wrapper 'spin-btn' para ficar vermelho
+        st.markdown('<div class="spin-btn">', unsafe_allow_html=True)
         spin = st.button("GIRAR ROLETA 🚀", use_container_width=True, disabled=len(labels) < 2)
+        st.markdown('</div>', unsafe_allow_html=True)
     with colB:
         st.slider("Duração", 2.0, 8.0, float(st.session_state.spin_duration), 0.5, key="spin_duration")
 
@@ -223,6 +267,10 @@ if page == "Roleta":
     if winner:
         st.subheader("🏆 Música sorteada")
         st.success(f"{winner['title']}")
-        if winner.get("audio"): render_autoplay_audio(winner["audio"], winner.get("mime") or "audio/mpeg")
+        if winner.get("audio"): 
+            b64 = base64.b64encode(winner["audio"]).decode("utf-8")
+            mime = winner.get("mime") or "audio/mpeg"
+            st.markdown(f'<audio autoplay controls><source src="data:{mime};base64,{b64}" type="{mime}"></audio>',
+                        unsafe_allow_html=True)
         if winner.get("url"): st.markdown(f"[Abrir link da música]({winner['url']})")
     st.markdown("</div>", unsafe_allow_html=True)
